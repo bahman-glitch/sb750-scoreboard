@@ -1,0 +1,839 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>SB750 Scoreboard</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: arena scoreboard. One dark, rink-at-night look on purpose; huge condensed numerals, ice-blue chrome, goal-light red for work, bench green for rest, gold for personal bests. */
+:root {
+  --ice: #0a121c;        /* page ground */
+  --boards: #111d2b;     /* raised surfaces */
+  --boards-2: #172738;   /* inputs, hover */
+  --line: #253a52;       /* hairlines */
+  --chalk: #e9f0f7;      /* main text */
+  --muted: #8ea3ba;      /* secondary text */
+  --blue: #5cc8ff;       /* chrome accent, buttons */
+  --goal: #ff4b3e;       /* work phase */
+  --bench: #3ddc8f;      /* rest phase */
+  --gold: #ffc53d;       /* personal best */
+  --on-accent: #06101a;
+  --display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", Impact, sans-serif;
+  --body: "Inter", -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --r: 14px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--ice); }
+body {
+  color: var(--chalk);
+  font-family: var(--body);
+  font-size: 16px;
+  line-height: 1.45;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 32px;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 100%;
+}
+button, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+.num { font-family: var(--display); font-variant-numeric: tabular-nums; letter-spacing: .01em; }
+h1, h2, h3 { font-family: var(--display); font-weight: 700; letter-spacing: .02em; text-wrap: balance; margin: 0; line-height: 1.05; }
+h1 { font-size: clamp(2rem, 5vw, 2.8rem); text-transform: uppercase; }
+h2 { font-size: 1.6rem; text-transform: uppercase; }
+h3 { font-size: 1.25rem; }
+.label { font-size: .72rem; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); font-weight: 600; }
+.muted { color: var(--muted); }
+.wrap { max-width: 1100px; margin: 0 auto; display: grid; gap: 22px; }
+
+/* Top bar */
+.top {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  background: var(--ice);
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding-block: 12px; border-bottom: 1px solid var(--line);
+  max-width: 1100px; margin: 0 auto 22px;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--ice); }
+.brand { font-family: var(--display); font-weight: 800; font-size: 1.4rem; letter-spacing: .06em; text-transform: uppercase; margin-right: auto; display: flex; align-items: center; gap: 8px; }
+.brand i { width: 12px; height: 12px; border-radius: 50%; background: var(--goal); box-shadow: 0 0 10px var(--goal); display: inline-block; }
+.nav { display: flex; gap: 6px; flex-wrap: wrap; }
+.nav button { background: transparent; border: 1px solid transparent; border-radius: 999px; padding: 8px 14px; color: var(--muted); font-weight: 600; font-size: .92rem; }
+.nav button[aria-current="page"] { color: var(--chalk); border-color: var(--line); background: var(--boards); }
+.pill { display: inline-flex; align-items: center; gap: 8px; border-radius: 999px; padding: 8px 14px; border: 1px solid var(--line); background: var(--boards); font-weight: 600; font-size: .9rem; }
+.pill .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+.pill[data-s="on"] .dot { background: var(--bench); box-shadow: 0 0 8px var(--bench); }
+.pill[data-s="demo"] .dot { background: var(--gold); }
+.pill[data-s="connecting"] .dot { background: var(--blue); animation: blink 1s infinite; }
+.pill[data-s="lost"] .dot { background: var(--goal); }
+@keyframes blink { 50% { opacity: .25; } }
+
+/* Buttons */
+.btn { border: 1px solid var(--line); background: var(--boards-2); border-radius: 12px; padding: 12px 18px; font-weight: 600; min-height: 48px; }
+.btn.primary { background: var(--blue); border-color: var(--blue); color: var(--on-accent); }
+.btn.go { background: var(--goal); border-color: var(--goal); color: #fff; font-family: var(--display); font-size: 1.5rem; letter-spacing: .06em; text-transform: uppercase; padding: 10px 26px; }
+.btn.ghost { background: transparent; }
+.btn.danger { color: var(--goal); border-color: color-mix(in srgb, var(--goal) 45%, var(--line)); background: transparent; }
+.btn.small { min-height: 38px; padding: 6px 12px; font-size: .9rem; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+/* Panels */
+.panel { background: var(--boards); border: 1px solid var(--line); border-radius: var(--r); padding: 20px; display: grid; gap: 14px; min-width: 0; }
+.notice { border-left: 4px solid var(--gold); background: var(--boards); border-radius: 10px; padding: 12px 16px; }
+.notice.bad { border-left-color: var(--goal); }
+
+/* Riders */
+.riders { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; }
+.rider-tile { background: var(--boards); border: 1px solid var(--line); border-radius: var(--r); padding: 22px 16px; display: grid; justify-items: center; gap: 10px; text-align: center; min-height: 190px; align-content: center; }
+.rider-tile:hover { background: var(--boards-2); }
+.avatar { width: 76px; height: 76px; border-radius: 50%; display: grid; place-items: center; font-family: var(--display); font-weight: 800; font-size: 2rem; color: var(--on-accent); }
+.avatar.sm { width: 34px; height: 34px; font-size: 1rem; }
+.rider-tile .name { font-family: var(--display); font-size: 1.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; line-height: 1; }
+.add-tile { border-style: dashed; color: var(--muted); }
+.add-tile .plus { font-family: var(--display); font-size: 3rem; line-height: 1; color: var(--blue); }
+.swatches { display: flex; gap: 10px; flex-wrap: wrap; }
+.swatch { width: 40px; height: 40px; border-radius: 50%; border: 3px solid transparent; }
+.swatch[aria-pressed="true"] { border-color: var(--chalk); }
+input[type="text"], textarea { background: var(--boards-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; width: 100%; min-width: 0; }
+textarea { min-height: 120px; font-family: ui-monospace, Menlo, monospace; font-size: .85rem; }
+
+/* Workouts */
+.workouts { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.wk { background: var(--boards); border: 1px solid var(--line); border-radius: var(--r); padding: 20px; display: grid; gap: 12px; grid-template-rows: auto auto 1fr auto; min-width: 0; }
+.wk .tag { color: var(--blue); }
+.wk .pb { display: flex; align-items: baseline; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; }
+.wk .pb .num { font-size: 2.4rem; color: var(--gold); line-height: 1; }
+.shape { display: flex; gap: 3px; align-items: flex-end; height: 26px; }
+.shape span { display: block; border-radius: 2px; }
+.shape .w { background: var(--goal); height: 26px; }
+.shape .r { background: var(--bench); height: 8px; opacity: .8; }
+
+/* Ride */
+.ride { display: grid; gap: 16px; grid-template-columns: 1.15fr 1fr; align-items: stretch; }
+@media (max-width: 820px) { .ride { grid-template-columns: 1fr; } }
+.clock { border-radius: var(--r); padding: 22px; display: grid; gap: 6px; align-content: center; justify-items: center; text-align: center; border: 2px solid var(--line); background: var(--boards); transition: background .2s, border-color .2s; min-height: 340px; }
+.clock[data-phase="work"] { background: color-mix(in srgb, var(--goal) 20%, var(--boards)); border-color: var(--goal); }
+.clock[data-phase="rest"] { background: color-mix(in srgb, var(--bench) 12%, var(--boards)); border-color: var(--bench); }
+.phase { font-family: var(--display); font-weight: 800; font-size: clamp(2.2rem, 6vw, 3.4rem); letter-spacing: .08em; text-transform: uppercase; line-height: 1; }
+.clock[data-phase="work"] .phase { color: var(--goal); }
+.clock[data-phase="rest"] .phase { color: var(--bench); }
+.clock[data-phase="prep"] .phase { color: var(--blue); }
+.secs { font-size: clamp(7rem, 20vw, 12rem); font-weight: 800; line-height: .9; }
+.side { display: grid; gap: 16px; align-content: start; min-width: 0; }
+.watts { display: flex; align-items: baseline; gap: 10px; }
+.watts .num { font-size: clamp(4.5rem, 12vw, 6.5rem); font-weight: 800; line-height: .9; }
+.watts .unit { font-family: var(--display); font-size: 1.8rem; color: var(--muted); }
+.minis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.mini { background: var(--boards-2); border-radius: 10px; padding: 10px 12px; }
+.mini .num { font-size: 2rem; font-weight: 700; line-height: 1; }
+.versus { display: grid; gap: 10px; }
+.vs-nums { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.vs-nums .num { font-size: 2.6rem; font-weight: 800; line-height: 1; }
+.bar { position: relative; height: 18px; background: var(--boards-2); border-radius: 999px; overflow: hidden; }
+.bar .fill { position: absolute; inset: 0 auto 0 0; background: var(--blue); border-radius: 999px; transition: width .25s; }
+.bar .fill.ahead { background: var(--gold); }
+.bar .ghost { position: absolute; top: -2px; bottom: -2px; width: 3px; background: var(--chalk); border-radius: 2px; transition: left .25s; }
+
+/* Results */
+.hero-score { text-align: center; display: grid; gap: 6px; justify-items: center; padding-block: 10px; }
+.hero-score .big { font-size: clamp(6rem, 18vw, 9.5rem); font-weight: 800; line-height: .85; }
+.hero-score .big small { font-size: .3em; color: var(--muted); margin-left: .15em; }
+.badge { display: inline-block; font-family: var(--display); font-weight: 800; letter-spacing: .1em; text-transform: uppercase; padding: 6px 16px; border-radius: 999px; font-size: 1.2rem; }
+.badge.pb { background: var(--gold); color: var(--on-accent); animation: pop .5s ease-out; }
+@keyframes pop { from { transform: scale(.7); } to { transform: scale(1); } }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.stat { background: var(--boards); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.stat .num { font-size: 2rem; font-weight: 700; line-height: 1.05; }
+.tablebox { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-size: .72rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+td.r, th.r { text-align: right; }
+.chip { font-size: .7rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: 2px 7px; border-radius: 6px; background: var(--boards-2); color: var(--gold); margin-left: 6px; }
+
+/* History and board */
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.spark { width: 100%; height: 70px; display: block; }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.tabs button { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 8px 14px; font-weight: 600; color: var(--muted); }
+.tabs button[aria-pressed="true"] { background: var(--chalk); color: var(--on-accent); border-color: var(--chalk); }
+.rank { font-family: var(--display); font-size: 1.6rem; font-weight: 800; color: var(--muted); width: 2ch; }
+.who { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+
+/* Modal and toast */
+.scrim { position: fixed; inset: 0; background: rgb(0 0 0 / .6); display: grid; place-items: center; z-index: 20; padding: 20px; }
+.modal { background: var(--boards); border: 1px solid var(--line); border-radius: var(--r); padding: 22px; max-width: 460px; width: 100%; display: grid; gap: 14px; }
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--chalk); color: var(--on-accent); padding: 12px 18px; border-radius: 12px; font-weight: 600; z-index: 30; max-width: min(92vw, 560px); box-shadow: 0 8px 30px rgb(0 0 0 / .4); }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+
+<header class="top" id="top"></header>
+<main class="wrap" id="main"></main>
+<div id="layer"></div>
+
+<script>
+"use strict";
+/* ---------- Workouts ---------- */
+var WORKOUTS = [
+  { id: "sprint", name: "10-second sprint", tag: "First-step speed", rounds: 3, work: 10, rest: 60, score: "peak", unit: "W",
+    blurb: "Three all-out 10-second sprints with a minute to recover. Score is your peak watts." },
+  { id: "tabata", name: "Tabata 20/10", tag: "Repeat sprints", rounds: 8, work: 20, rest: 10, score: "kcal", unit: "cal",
+    blurb: "Eight rounds of 20 seconds hard, 10 seconds easy. Score is total calories." },
+  { id: "shift", name: "Shift intervals", tag: "Shift-length effort", rounds: 6, work: 30, rest: 90, score: "avgWork", unit: "W",
+    blurb: "Six 30-second shifts with 90 seconds on the bench. Score is your average watts while working." }
+];
+var PREP = 5;
+var COLORS = ["#5cc8ff", "#ff8a3d", "#b48cff", "#3ddc8f", "#ffc53d", "#ff6b9a"];
+var STORE_KEY = "sb750-scoreboard-v1";
+
+function wk(id) { for (var i = 0; i < WORKOUTS.length; i++) if (WORKOUTS[i].id === id) return WORKOUTS[i]; return WORKOUTS[0]; }
+function totalSecs(w) { return w.rounds * w.work + (w.rounds - 1) * w.rest; }
+function fmtDur(s) { var m = Math.floor(s / 60), r = s % 60; return m + ":" + (r < 10 ? "0" : "") + r; }
+
+/* ---------- Storage ---------- */
+var storageOk = true;
+function load() {
+  try {
+    var t = localStorage.getItem(STORE_KEY);
+    if (t) { var d = JSON.parse(t); if (d && Array.isArray(d.riders) && Array.isArray(d.sessions)) return d; }
+  } catch (e) { storageOk = false; }
+  return { version: 1, riders: [], sessions: [] };
+}
+var db = load();
+function save() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(db)); storageOk = true; }
+  catch (e) { storageOk = false; toast("Couldn't save on this device. Copy a backup from Settings."); }
+}
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+function rider(id) { for (var i = 0; i < db.riders.length; i++) if (db.riders[i].id === id) return db.riders[i]; return null; }
+function initials(n) { var p = String(n).trim().split(/\s+/); return ((p[0] || "?")[0] + (p[1] ? p[1][0] : "")).toUpperCase(); }
+function sessionsFor(rid, wid, demo) {
+  return db.sessions.filter(function (s) { return s.riderId === rid && (!wid || s.workout === wid) && (demo === undefined || !!s.demo === demo); })
+    .sort(function (a, b) { return a.date - b.date; });
+}
+function bestFor(rid, wid, demo) {
+  var best = null;
+  sessionsFor(rid, wid, !!demo).forEach(function (s) { if (best === null || s.score > best) best = s.score; });
+  return best;
+}
+
+/* ---------- App state ---------- */
+var app = { screen: "riders", riderId: null, result: null, board: "sprint", boardSort: "best", adding: false, addColor: COLORS[0], restoreOpen: false };
+
+/* ---------- FTMS Indoor Bike Data (0x2AD2) ---------- */
+function parseIndoorBikeData(dv) {
+  var r = {}, o = 0;
+  try {
+    var f = dv.getUint16(o, true); o += 2;
+    if (!(f & 1)) { r.speed = dv.getUint16(o, true) / 100; o += 2; }       // km/h
+    if (f & 2) o += 2;                                                     // average speed
+    if (f & 4) { r.cadence = dv.getUint16(o, true) / 2; o += 2; }          // rpm
+    if (f & 8) o += 2;                                                     // average cadence
+    if (f & 16) { r.distance = dv.getUint8(o) | (dv.getUint8(o + 1) << 8) | (dv.getUint8(o + 2) << 16); o += 3; } // metres
+    if (f & 32) o += 2;                                                    // resistance
+    if (f & 64) { r.power = dv.getInt16(o, true); o += 2; }               // watts
+    if (f & 128) o += 2;                                                   // average power
+    if (f & 256) { var e = dv.getUint16(o, true); if (e !== 0xFFFF) r.energy = e; o += 5; } // kcal total
+    if (f & 512) { var h = dv.getUint8(o); if (h > 0) r.hr = h; o += 1; }
+  } catch (err) { /* short packet: keep what we parsed */ }
+  return r;
+}
+
+/* ---------- Bike connection ---------- */
+var bike = { status: "off", device: null, live: {}, lastAt: 0, demo: false, demoTimer: null };
+function setStatus(s) { bike.status = s; renderTop(); if (app.screen === "workouts") render(); }
+function onPacket(dv) {
+  var r = parseIndoorBikeData(dv);
+  for (var k in r) bike.live[k] = r[k];
+  bike.lastAt = performance.now();
+}
+function niceErr(e) {
+  var n = e && e.name;
+  if (n === "NotFoundError") return "No bike picked. Pedal to wake the console, then try again. If it never shows up, use Show all devices in Settings.";
+  if (n === "SecurityError") return "This page isn't allowed to use Bluetooth here. Open it directly in Bluefy.";
+  if (n === "NetworkError") return "Lost the connection to the bike. Pedal to wake it and reconnect.";
+  return "Couldn't connect: " + (e && e.message ? e.message : "unknown error");
+}
+function hasBluetooth() { return !!(navigator.bluetooth && navigator.bluetooth.requestDevice); }
+function connectBike(all) {
+  if (!hasBluetooth()) {
+    modal("Bluetooth isn't available in this browser",
+      "<p>Safari can't talk to Bluetooth devices. Open this page in the free Bluefy app on the iPad to connect the SB750. You can try everything in Demo mode right now.</p>",
+      [{ label: "Use Demo mode", cls: "primary", fn: startDemo }, { label: "Close" }]);
+    return;
+  }
+  setStatus("connecting");
+  var opts = all ? { acceptAllDevices: true, optionalServices: [0x1826] } : { filters: [{ services: [0x1826] }] };
+  navigator.bluetooth.requestDevice(opts).then(function (device) {
+    bike.device = device;
+    device.addEventListener("gattserverdisconnected", function () { if (bike.status === "on") setStatus("lost"); });
+    return attach(device);
+  }).catch(function (e) { setStatus(bike.device ? "lost" : "off"); toast(niceErr(e)); });
+}
+function attach(device) {
+  return device.gatt.connect()
+    .then(function (server) { return server.getPrimaryService(0x1826); })
+    .then(function (svc) { return svc.getCharacteristic(0x2AD2); })
+    .then(function (ch) {
+      ch.addEventListener("characteristicvaluechanged", function (ev) { onPacket(ev.target.value); });
+      return ch.startNotifications();
+    })
+    .then(function () { stopDemo(); setStatus("on"); toast("Bike connected. Pedal to see live watts."); });
+}
+function reconnect() {
+  if (!bike.device) return connectBike(false);
+  setStatus("connecting");
+  attach(bike.device).catch(function (e) { setStatus("lost"); toast(niceErr(e)); });
+}
+function disconnectBike() {
+  try { if (bike.device && bike.device.gatt.connected) bike.device.gatt.disconnect(); } catch (e) {}
+  bike.device = null; setStatus("off");
+}
+
+/* Demo: builds real FTMS packets so the same parser is exercised */
+function buildPacket(p) {
+  var buf = new ArrayBuffer(2 + 2 + 2 + 3 + 2 + 5), dv = new DataView(buf), o = 0;
+  dv.setUint16(o, 4 | 16 | 64 | 256, true); o += 2;
+  dv.setUint16(o, Math.round(p.speed * 100), true); o += 2;
+  dv.setUint16(o, Math.round(p.cadence * 2), true); o += 2;
+  var d = Math.round(p.distance); dv.setUint8(o, d & 255); dv.setUint8(o + 1, (d >> 8) & 255); dv.setUint8(o + 2, (d >> 16) & 255); o += 3;
+  dv.setInt16(o, Math.round(p.power), true); o += 2;
+  dv.setUint16(o, Math.floor(p.energy), true); dv.setUint16(o + 2, 0, true); dv.setUint8(o + 4, 0); o += 5;
+  return dv;
+}
+function startDemo() {
+  if (bike.device) disconnectBike();
+  stopDemo();
+  bike.demo = true;
+  var st = { power: 0, distance: 0, energy: 0, strength: 300 + Math.random() * 140, last: performance.now() };
+  bike.demoTimer = setInterval(function () {
+    var now = performance.now(), dt = (now - st.last) / 1000; st.last = now;
+    var ph = ride ? ride.phases[ride.idx] : null;
+    var target = 40;
+    if (ph && ph.type === "work") {
+      var into = (now - ride.phaseStart) / 1000;
+      var fade = Math.max(0.55, 1 - ph.round * 0.04 - into * 0.012);
+      target = st.strength * fade * (into < 1.5 ? 1.25 : 1);
+    } else if (ph && ph.type === "rest") target = 70;
+    st.power += (target - st.power) * 0.35 + (Math.random() - 0.5) * 18;
+    st.power = Math.max(0, st.power);
+    var cadence = st.power > 5 ? 22 + Math.sqrt(st.power) * 3.4 : 0;
+    var speed = cadence * 0.42;
+    st.distance += speed / 3.6 * dt;
+    st.energy += st.power * dt / 1000 * 1.15;
+    onPacket(buildPacket({ power: st.power, cadence: cadence, speed: speed, distance: st.distance, energy: st.energy }));
+  }, 250);
+  setStatus("demo");
+  toast("Demo mode: a simulated rider. Demo rides are tagged and kept out of personal bests.");
+}
+function stopDemo() {
+  if (bike.demoTimer) clearInterval(bike.demoTimer);
+  bike.demoTimer = null; bike.demo = false;
+  if (bike.status === "demo") bike.status = "off";
+}
+function dataFresh() { return performance.now() - bike.lastAt < 3000; }
+
+/* ---------- Sound and screen ---------- */
+var audio = null, wakeLock = null;
+function initAudio() {
+  try { if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)(); if (audio.state === "suspended") audio.resume(); } catch (e) { audio = null; }
+}
+function beep(freq, dur) {
+  if (!audio) return;
+  try {
+    var o = audio.createOscillator(), g = audio.createGain();
+    o.type = "square"; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.18, audio.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + dur);
+    o.connect(g); g.connect(audio.destination); o.start(); o.stop(audio.currentTime + dur);
+  } catch (e) {}
+}
+function keepAwake() {
+  try { if (navigator.wakeLock) navigator.wakeLock.request("screen").then(function (l) { wakeLock = l; }).catch(function () {}); } catch (e) {}
+}
+
+/* ---------- Ride engine ---------- */
+var ride = null;
+function buildPhases(w) {
+  var ph = [{ type: "prep", dur: PREP, round: 0 }];
+  for (var i = 1; i <= w.rounds; i++) {
+    ph.push({ type: "work", dur: w.work, round: i });
+    if (i < w.rounds) ph.push({ type: "rest", dur: w.rest, round: i });
+  }
+  return ph;
+}
+function newAcc() { return { peakW: 0, workJ: 0, workSec: 0, allJ: 0, peakKmh: 0, maxHr: 0, dist: 0, kcalBike: 0, lastDist: null, lastEnergy: null, distFromBike: false, kcalFromBike: false, rounds: {}, gapSec: 0 }; }
+function sampleInto(acc, phaseType, round, L, dt) {
+  var p = Math.max(0, L.power || 0);
+  var counting = phaseType !== "prep";
+  if (L.distance != null) {
+    if (counting && acc.lastDist != null && L.distance >= acc.lastDist) { acc.dist += L.distance - acc.lastDist; acc.distFromBike = true; }
+    acc.lastDist = L.distance;
+  } else if (counting) acc.dist += (L.speed || 0) / 3.6 * dt;
+  if (L.energy != null) {
+    if (counting && acc.lastEnergy != null && L.energy >= acc.lastEnergy) { acc.kcalBike += L.energy - acc.lastEnergy; acc.kcalFromBike = true; }
+    acc.lastEnergy = L.energy;
+  }
+  if (!counting) return;
+  acc.allJ += p * dt;
+  if ((L.speed || 0) > acc.peakKmh) acc.peakKmh = L.speed;
+  if ((L.hr || 0) > acc.maxHr) acc.maxHr = L.hr;
+  if (phaseType === "work") {
+    acc.workJ += p * dt; acc.workSec += dt;
+    if (p > acc.peakW) acc.peakW = p;
+    var rr = acc.rounds[round] || (acc.rounds[round] = { peak: 0, J: 0, sec: 0 });
+    rr.J += p * dt; rr.sec += dt; if (p > rr.peak) rr.peak = p;
+  }
+}
+function kcalOf(acc) { return acc.kcalFromBike ? acc.kcalBike : acc.allJ / 1000; }
+function scoreOf(w, acc) {
+  if (w.score === "peak") return Math.round(acc.peakW);
+  if (w.score === "kcal") return Math.round(kcalOf(acc) * 10) / 10;
+  return acc.workSec ? Math.round(acc.workJ / acc.workSec) : 0;
+}
+function fmtScore(w, v) { if (v == null) return "—"; return w.score === "kcal" ? (Math.round(v * 10) / 10).toFixed(1) : String(Math.round(v)); }
+
+function startRide() {
+  var w = wk(app.workoutId);
+  initAudio(); keepAwake();
+  ride = { w: w, phases: buildPhases(w), idx: 0, phaseStart: performance.now(), acc: newAcc(), beeped: {}, demo: bike.demo,
+           pb: bestFor(app.riderId, w.id, bike.demo) };
+  ride.timer = setInterval(rideTick, 100);
+  ride.sampler = setInterval(function () {
+    if (!ride) return;
+    var ph = ride.phases[ride.idx];
+    if (!dataFresh()) { if (ph.type !== "prep") ride.acc.gapSec += 0.25; return; }
+    sampleInto(ride.acc, ph.type, ph.round, bike.live, 0.25);
+  }, 250);
+  app.screen = "ride"; render();
+}
+function rideTick() {
+  if (!ride) return;
+  var now = performance.now();
+  var ph = ride.phases[ride.idx];
+  var el = (now - ride.phaseStart) / 1000;
+  if (el >= ph.dur) {
+    if (ph.type === "work") beep(440, 0.45);
+    ride.idx++; ride.phaseStart += ph.dur * 1000;
+    if (ride.idx >= ride.phases.length) return finishRide();
+    ph = ride.phases[ride.idx]; el = (now - ride.phaseStart) / 1000;
+    if (ph.type === "work") beep(1046, 0.5);
+  }
+  var left = Math.ceil(ph.dur - el);
+  if (ph.type !== "work" && left <= 3 && left >= 1) {
+    var key = ride.idx + ":" + left;
+    if (!ride.beeped[key]) { ride.beeped[key] = 1; beep(784, 0.12); }
+  }
+  paintRide(ph, left);
+}
+function stopTimers() { if (ride) { clearInterval(ride.timer); clearInterval(ride.sampler); } try { if (wakeLock) wakeLock.release(); } catch (e) {} wakeLock = null; }
+function quitRide() {
+  modal("End this workout?", "<p>This ride won't be saved.</p>", [
+    { label: "End without saving", cls: "danger", fn: function () { stopTimers(); ride = null; app.screen = "workouts"; render(); } },
+    { label: "Keep riding", cls: "primary" }]);
+}
+function finishRide() {
+  stopTimers();
+  var w = ride.w, acc = ride.acc;
+  var noData = acc.workSec < Math.min(5, w.work);
+  var s = {
+    id: uid(), riderId: app.riderId, workout: w.id, date: Date.now(), demo: ride.demo,
+    score: scoreOf(w, acc), unit: w.unit,
+    peakW: Math.round(acc.peakW), avgWorkW: acc.workSec ? Math.round(acc.workJ / acc.workSec) : 0,
+    kcal: Math.round(kcalOf(acc) * 10) / 10, kcalEstimated: !acc.kcalFromBike,
+    distM: Math.round(acc.dist), peakKmh: Math.round(acc.peakKmh * 10) / 10, maxHr: acc.maxHr || null,
+    rounds: Object.keys(acc.rounds).map(function (k) { var r = acc.rounds[k]; return { round: +k, peak: Math.round(r.peak), avg: r.sec ? Math.round(r.J / r.sec) : 0 }; }),
+    gapSec: Math.round(acc.gapSec)
+  };
+  var prev = ride.pb;
+  app.result = { session: s, prev: prev, isPB: !noData && (prev === null || s.score > prev), first: prev === null, noData: noData };
+  if (!noData) { db.sessions.push(s); save(); }
+  if (app.result.isPB) { beep(1318, 0.18); setTimeout(function () { beep(1568, 0.35); }, 200); }
+  ride = null; app.screen = "results"; render();
+}
+
+/* ---------- UI helpers ---------- */
+function toast(msg) {
+  var t = document.createElement("div"); t.className = "toast"; t.setAttribute("role", "status"); t.textContent = msg;
+  document.body.appendChild(t); setTimeout(function () { t.remove(); }, 4200);
+}
+function modal(title, html, buttons) {
+  var layer = document.getElementById("layer");
+  layer.innerHTML = '<div class="scrim"><div class="modal" role="dialog" aria-modal="true" aria-label="' + esc(title) + '"><h3>' + esc(title) + "</h3>" + html +
+    '<div class="row" id="mbtns"></div></div></div>';
+  var row = document.getElementById("mbtns");
+  buttons.forEach(function (b) {
+    var el = document.createElement("button"); el.className = "btn " + (b.cls || ""); el.textContent = b.label;
+    el.onclick = function () { layer.innerHTML = ""; if (b.fn) b.fn(); };
+    row.appendChild(el);
+  });
+}
+function go(screen) { if (ride) return; app.screen = screen; render(); window.scrollTo(0, 0); }
+function statusText() {
+  return { off: "Bike not connected", connecting: "Connecting…", on: "Bike connected", demo: "Demo mode", lost: "Bike disconnected" }[bike.status];
+}
+
+/* ---------- Render ---------- */
+function renderTop() {
+  var top = document.getElementById("top");
+  var r = rider(app.riderId);
+  var riding = app.screen === "ride";
+  var navItems = [["riders", "Riders"], ["history", "History"], ["board", "Family board"], ["settings", "Settings"]];
+  var cur = app.screen === "workouts" || app.screen === "results" ? "riders" : app.screen;
+  top.innerHTML =
+    '<div class="brand"><i></i>SB750 Scoreboard</div>' +
+    (riding ? "" : '<nav class="nav">' + navItems.map(function (n) {
+      return '<button data-nav="' + n[0] + '"' + (cur === n[0] ? ' aria-current="page"' : "") + ">" + n[1] + "</button>";
+    }).join("") + "</nav>") +
+    (r ? '<span class="pill"><span class="avatar sm" style="background:' + r.color + '">' + esc(initials(r.name)) + "</span>" + esc(r.name) + "</span>" : "") +
+    '<button class="pill" id="bikePill" data-s="' + bike.status + '"><span class="dot"></span>' + statusText() + "</button>";
+  top.querySelectorAll("[data-nav]").forEach(function (b) { b.onclick = function () { go(b.dataset.nav); }; });
+  document.getElementById("bikePill").onclick = function () {
+    if (riding) return;
+    if (bike.status === "lost") reconnect();
+    else if (bike.status === "off") connectBike(false);
+    else go("settings");
+  };
+}
+
+function render() {
+  renderTop();
+  var m = document.getElementById("main");
+  var f = { riders: viewRiders, workouts: viewWorkouts, ride: viewRide, results: viewResults, history: viewHistory, board: viewBoard, settings: viewSettings }[app.screen];
+  m.innerHTML = f();
+  bind[app.screen] && bind[app.screen]();
+}
+var bind = {};
+
+/* Riders */
+function viewRiders() {
+  var tiles = db.riders.map(function (r) {
+    var ss = sessionsFor(r.id, null, false);
+    var last = ss.length ? new Date(ss[ss.length - 1].date).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "No rides yet";
+    return '<button class="rider-tile" data-rider="' + r.id + '"><span class="avatar" style="background:' + r.color + '">' + esc(initials(r.name)) +
+      '</span><span class="name">' + esc(r.name) + '</span><span class="muted">' + (ss.length ? ss.length + " rides · last " + last : last) + "</span></button>";
+  }).join("");
+  var addForm = app.adding ?
+    '<form class="panel" id="addForm"><h3>New rider</h3><label class="label" for="riderName">Name</label>' +
+    '<input type="text" id="riderName" maxlength="20" placeholder="e.g. Liam" autocomplete="off">' +
+    '<span class="label">Colour</span><div class="swatches">' + COLORS.map(function (c) {
+      return '<button type="button" class="swatch" data-color="' + c + '" style="background:' + c + '" aria-label="Colour ' + c + '" aria-pressed="' + (app.addColor === c) + '"></button>';
+    }).join("") + '</div><div class="row"><button class="btn primary" type="submit">Add rider</button><button class="btn ghost" type="button" id="cancelAdd">Cancel</button></div></form>' : "";
+  return '<section style="display:grid;gap:8px"><h1>Who’s riding?</h1><p class="muted">Pick your name, then a workout. Every ride is scored against your own best.</p></section>' +
+    (!storageOk ? '<div class="notice bad">This browser isn’t letting the page save. Rides will be lost when it closes. Copy a backup from Settings after each ride.</div>' : "") +
+    (db.riders.length ? "" : '<div class="notice">No riders yet. Add your son first, then anyone else who will use the bike.</div>') +
+    '<div class="riders">' + tiles + (app.adding ? "" : '<button class="rider-tile add-tile" id="addRider"><span class="plus">+</span><span>Add rider</span></button>') + "</div>" + addForm;
+}
+bind.riders = function () {
+  document.querySelectorAll("[data-rider]").forEach(function (b) { b.onclick = function () { app.riderId = b.dataset.rider; go("workouts"); }; });
+  var a = document.getElementById("addRider"); if (a) a.onclick = function () { app.adding = true; app.addColor = COLORS[db.riders.length % COLORS.length]; render(); var i = document.getElementById("riderName"); if (i) i.focus(); };
+  var f = document.getElementById("addForm");
+  if (f) {
+    f.querySelectorAll("[data-color]").forEach(function (s) { s.onclick = function () { app.addColor = s.dataset.color; f.querySelectorAll("[data-color]").forEach(function (x) { x.setAttribute("aria-pressed", x === s); }); }; });
+    document.getElementById("cancelAdd").onclick = function () { app.adding = false; render(); };
+    f.onsubmit = function (e) {
+      e.preventDefault();
+      var n = document.getElementById("riderName").value.trim();
+      if (!n) { toast("Type a name first."); return; }
+      db.riders.push({ id: uid(), name: n, color: app.addColor }); save();
+      app.adding = false; render(); toast(n + " added.");
+    };
+  }
+};
+
+/* Workouts */
+function shapeBar(w) {
+  var total = totalSecs(w), html = "";
+  for (var i = 1; i <= w.rounds; i++) {
+    html += '<span class="w" style="flex:' + w.work + '"></span>';
+    if (i < w.rounds) html += '<span class="r" style="flex:' + w.rest + '"></span>';
+  }
+  return '<div class="shape" aria-hidden="true">' + html + "</div>";
+}
+function viewWorkouts() {
+  var r = rider(app.riderId);
+  if (!r) { app.screen = "riders"; return viewRiders(); }
+  var conn = bike.status === "on" || bike.status === "demo";
+  var connBox = conn ? "" :
+    '<div class="panel"><div class="row" style="justify-content:space-between"><div><h3>' + (bike.status === "lost" ? "The bike dropped out" : "Connect the bike") +
+    '</h3><p class="muted" style="margin:4px 0 0">Pedal a few strokes to wake the console, then connect. No bike handy? Demo mode simulates a rider.</p></div>' +
+    '<div class="row"><button class="btn primary" id="cBike">' + (bike.status === "lost" ? "Reconnect" : "Connect bike") + '</button><button class="btn" id="cDemo">Demo mode</button></div></div></div>';
+  var cards = WORKOUTS.map(function (w) {
+    var pb = bestFor(r.id, w.id, false);
+    return '<article class="wk"><div><div class="label tag">' + w.tag + '</div><h2 style="margin-top:4px">' + w.name + '</h2></div>' + shapeBar(w) +
+      '<p class="muted" style="margin:0">' + w.blurb + " " + fmtDur(totalSecs(w)) + ' total.</p>' +
+      '<div><div class="pb">' + (pb === null ? '<span class="muted">No score yet. Set the first one.</span>' : '<span class="num">' + fmtScore(w, pb) + '</span><span class="label">' + w.unit + " personal best</span>") +
+      '</div><button class="btn go" style="width:100%;margin-top:12px" data-start="' + w.id + '">Start</button></div></article>';
+  }).join("");
+  return '<section class="row" style="justify-content:space-between"><div style="display:grid;gap:6px"><span class="label">Rider</span><h1>' + esc(r.name) + '</h1></div>' +
+    '<button class="btn ghost" id="switchRider">Switch rider</button></section>' + connBox + '<div class="workouts">' + cards + "</div>";
+}
+bind.workouts = function () {
+  var b = document.getElementById("cBike"); if (b) b.onclick = function () { bike.status === "lost" ? reconnect() : connectBike(false); };
+  var d = document.getElementById("cDemo"); if (d) d.onclick = startDemo;
+  document.getElementById("switchRider").onclick = function () { go("riders"); };
+  document.querySelectorAll("[data-start]").forEach(function (btn) {
+    btn.onclick = function () {
+      app.workoutId = btn.dataset.start;
+      if (bike.status === "on" || bike.status === "demo") return startRide();
+      modal("The bike isn’t connected", "<p>Connect the SB750 so the scoreboard can read watts, or ride a demo to try it out.</p>", [
+        { label: "Connect bike", cls: "primary", fn: function () { bike.status === "lost" ? reconnect() : connectBike(false); } },
+        { label: "Demo ride", fn: function () { startDemo(); startRide(); } }, { label: "Cancel", cls: "ghost" }]);
+    };
+  });
+};
+
+/* Ride */
+function viewRide() {
+  var w = ride.w;
+  return '<div class="row" style="justify-content:space-between"><div><span class="label">' + esc(rider(app.riderId).name) + (ride.demo ? " · demo" : "") + '</span><h2>' + w.name + '</h2></div>' +
+    '<button class="btn danger small" id="quit">End</button></div>' +
+    '<div class="ride"><div class="clock" id="clock" data-phase="prep"><div class="phase" id="phase">Get ready</div><div class="secs num" id="secs">5</div><div class="label" id="roundLbl" style="font-size:.95rem">Round 1 of ' + w.rounds + "</div></div>" +
+    '<div class="side"><div class="panel"><span class="label">Power now</span><div class="watts"><span class="num" id="lw">0</span><span class="unit">W</span></div>' +
+    '<div class="minis"><div class="mini"><div class="label">Cadence</div><div class="num" id="lc">0</div></div><div class="mini"><div class="label">km/h</div><div class="num" id="ls">0</div></div><div class="mini"><div class="label">Heart</div><div class="num" id="lh">—</div></div></div></div>' +
+    '<div class="panel versus"><div class="vs-nums"><div><div class="label">' + scoreLabel(w) + '</div><div class="num" id="sc">0</div></div><div style="text-align:right"><div class="label" id="pbLbl">' + (ride.pb === null ? "First ride" : "Best") + '</div><div class="num" id="pbv" style="color:var(--gold)">' + (ride.pb === null ? "—" : fmtScore(w, ride.pb)) + "</div></div></div>" +
+    '<div class="bar"><div class="fill" id="bf" style="width:0%"></div><div class="ghost" id="bg" style="left:0%"></div></div><div class="muted" id="vsNote" style="font-size:.9rem"></div></div>' +
+    '<div class="notice bad" id="stale" hidden>No numbers coming from the bike. Pedal to wake the console. If it stays blank, end the ride and reconnect.</div></div></div>';
+}
+function scoreLabel(w) { return w.score === "peak" ? "Peak watts" : w.score === "kcal" ? "Calories" : "Avg working watts"; }
+bind.ride = function () { document.getElementById("quit").onclick = quitRide; };
+function paintRide(ph, left) {
+  var clock = document.getElementById("clock"); if (!clock) return;
+  var w = ride.w, acc = ride.acc, L = bike.live, fresh = dataFresh();
+  clock.dataset.phase = ph.type;
+  document.getElementById("phase").textContent = ph.type === "prep" ? "Get ready" : ph.type === "work" ? "Go!" : "Rest";
+  document.getElementById("secs").textContent = Math.max(0, left);
+  var rnd = ph.type === "prep" ? 1 : ph.type === "rest" ? ph.round + 1 : ph.round;
+  document.getElementById("roundLbl").textContent = (ph.type === "rest" ? "Next: round " : "Round ") + rnd + " of " + w.rounds;
+  document.getElementById("lw").textContent = fresh ? Math.round(Math.max(0, L.power || 0)) : "–";
+  document.getElementById("lc").textContent = fresh ? Math.round(L.cadence || 0) : "–";
+  document.getElementById("ls").textContent = fresh ? (L.speed || 0).toFixed(1) : "–";
+  document.getElementById("lh").textContent = fresh && L.hr ? L.hr : "—";
+  document.getElementById("stale").hidden = fresh || ph.type === "prep";
+  var cur = scoreOf(w, acc), pb = ride.pb;
+  document.getElementById("sc").textContent = fmtScore(w, cur);
+  // Ghost: where the best ride was at this point (calories scale with work time done)
+  var target = pb, frac = 1;
+  if (pb !== null && w.score === "kcal") {
+    var done = 0;
+    for (var i = 1; i < ride.idx; i++) if (ride.phases[i].type === "work") done += ride.phases[i].dur;
+    if (ph.type === "work") done += ph.dur - Math.max(0, left);
+    frac = done / (w.rounds * w.work); target = pb * frac;
+  }
+  var scale = pb === null ? Math.max(cur, 1) : pb * 1.25;
+  var fill = document.getElementById("bf");
+  fill.style.width = Math.min(100, cur / scale * 100) + "%";
+  fill.className = "fill" + (pb !== null && cur > target ? " ahead" : "");
+  var g = document.getElementById("bg");
+  g.hidden = pb === null; if (pb !== null) g.style.left = Math.min(99, target / scale * 100) + "%";
+  var note = document.getElementById("vsNote");
+  if (pb === null) note.textContent = "First time on this workout. Whatever you score becomes the number to beat.";
+  else if (ph.type === "prep") note.textContent = "White line is your best. Beat it.";
+  else {
+    var diff = cur - target;
+    note.textContent = w.score === "kcal" ? (diff >= 0 ? "Ahead of your best pace by " + diff.toFixed(1) + " cal" : "Behind your best pace by " + (-diff).toFixed(1) + " cal")
+      : (diff > 0 ? "Beating your best by " + Math.round(diff) + " W" : Math.round(-diff) + " W to beat your best");
+  }
+}
+
+/* Results */
+function viewResults() {
+  var R = app.result, s = R.session, w = wk(s.workout);
+  if (R.noData) {
+    return '<section class="panel"><h1>No bike data</h1><p>The scoreboard didn’t receive watts during the work rounds, so this ride wasn’t saved. Pedal to wake the console, reconnect from the bike button at the top, and try again.</p>' +
+      '<div class="row"><button class="btn primary" id="again">Try again</button><button class="btn" id="pick">Choose workout</button></div></section>';
+  }
+  var head = R.isPB ? '<span class="badge pb">' + (R.first ? "First score set" : "New personal best") + "</span>" :
+    '<span class="muted">Best is ' + fmtScore(w, R.prev) + " " + w.unit + ". " + (w.score === "kcal" ? (R.prev - s.score).toFixed(1) : Math.round(R.prev - s.score)) + " to go.</span>";
+  var dist = s.distM >= 1000 ? (s.distM / 1000).toFixed(2) + " km" : s.distM + " m";
+  var stats = [["Peak watts", s.peakW], ["Avg working watts", s.avgWorkW], ["Calories" + (s.kcalEstimated ? " (est.)" : ""), s.kcal.toFixed(1)], ["Distance", dist], ["Top speed", s.peakKmh + " km/h"]];
+  if (s.maxHr) stats.push(["Max heart rate", s.maxHr]);
+  var rows = s.rounds.map(function (r) { return "<tr><td>" + r.round + '</td><td class="r">' + r.peak + '</td><td class="r">' + r.avg + "</td></tr>"; }).join("");
+  return '<section class="hero-score"><span class="label">' + esc(rider(s.riderId) ? rider(s.riderId).name : "") + " · " + w.name + (s.demo ? '<span class="chip">Demo</span>' : "") + '</span>' +
+    '<div class="big num">' + fmtScore(w, s.score) + "<small>" + w.unit + "</small></div>" + head + "</section>" +
+    (s.gapSec > 3 ? '<div class="notice">The bike stopped sending data for about ' + s.gapSec + " seconds, so this score may be low.</div>" : "") +
+    '<div class="stats">' + stats.map(function (x) { return '<div class="stat"><div class="label">' + x[0] + '</div><div class="num">' + x[1] + "</div></div>"; }).join("") + "</div>" +
+    '<div class="panel"><h3>Round by round</h3><div class="tablebox"><table><thead><tr><th>Round</th><th class="r">Peak W</th><th class="r">Avg W</th></tr></thead><tbody>' + rows + "</tbody></table></div></div>" +
+    '<div class="row"><button class="btn go" id="again">Ride again</button><button class="btn" id="pick">Choose workout</button><button class="btn ghost" id="sw">Switch rider</button></div>';
+}
+bind.results = function () {
+  document.getElementById("again").onclick = function () { (bike.status === "on" || bike.status === "demo") ? startRide() : go("workouts"); };
+  document.getElementById("pick").onclick = function () { go("workouts"); };
+  var sw = document.getElementById("sw"); if (sw) sw.onclick = function () { go("riders"); };
+};
+
+/* History */
+function spark(vals, color) {
+  if (vals.length < 2) return '<p class="muted" style="margin:0">Ride this twice to see a trend.</p>';
+  var W = 300, H = 70, pad = 8, mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals);
+  if (mx === mn) { mx += 1; mn -= 1; }
+  var pts = vals.map(function (v, i) { return [pad + i * (W - 2 * pad) / (vals.length - 1), H - pad - (v - mn) / (mx - mn) * (H - 2 * pad)]; });
+  var line = pts.map(function (p) { return p[0].toFixed(1) + "," + p[1].toFixed(1); }).join(" ");
+  var area = pad + "," + (H - pad) + " " + line + " " + pts[pts.length - 1][0].toFixed(1) + "," + (H - pad);
+  var bi = vals.indexOf(Math.max.apply(null, vals)), last = pts[pts.length - 1];
+  return '<svg class="spark" viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="none" role="img" aria-label="Scores over time">' +
+    '<line x1="' + pad + '" x2="' + (W - pad) + '" y1="' + (H - pad) + '" y2="' + (H - pad) + '" stroke="var(--line)"/>' +
+    '<polygon points="' + area + '" fill="' + color + '" fill-opacity=".14"/>' +
+    '<polyline points="' + line + '" fill="none" stroke="' + color + '" stroke-width="2.5" vector-effect="non-scaling-stroke"/>' +
+    '<circle cx="' + pts[bi][0] + '" cy="' + pts[bi][1] + '" r="4.5" fill="var(--gold)"/>' +
+    '<circle cx="' + last[0] + '" cy="' + last[1] + '" r="3.5" fill="var(--chalk)"/></svg>';
+}
+function viewHistory() {
+  if (!db.riders.length) return '<h1>History</h1><div class="notice">Add a rider and finish a ride to start a history.</div>';
+  var r = rider(app.riderId) || db.riders[0]; app.riderId = r.id;
+  var pick = '<div class="tabs">' + db.riders.map(function (x) { return '<button data-hr="' + x.id + '" aria-pressed="' + (x.id === r.id) + '">' + esc(x.name) + "</button>"; }).join("") + "</div>";
+  var cards = WORKOUTS.map(function (w) {
+    var ss = sessionsFor(r.id, w.id, false), pb = bestFor(r.id, w.id, false);
+    return '<div class="panel"><div class="row" style="justify-content:space-between;align-items:baseline"><h3>' + w.name + '</h3><span class="muted">' + ss.length + " rides</span></div>" +
+      '<div class="row" style="align-items:baseline;gap:8px"><span class="num" style="font-size:2.4rem;color:var(--gold);line-height:1">' + fmtScore(w, pb) + '</span><span class="label">' + w.unit + " best</span></div>" +
+      spark(ss.slice(-20).map(function (s) { return s.score; }), r.color) + "</div>";
+  }).join("");
+  var all = sessionsFor(r.id).slice().reverse().slice(0, 40);
+  var rows = all.map(function (s) {
+    var w = wk(s.workout), d = new Date(s.date);
+    return "<tr><td>" + d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) +
+      "</td><td>" + w.name + (s.demo ? '<span class="chip">Demo</span>' : "") + '</td><td class="r num" style="font-size:1.3rem">' + fmtScore(w, s.score) + " " + w.unit +
+      '</td><td class="r">' + s.peakW + '</td><td class="r"><button class="btn small ghost" data-del="' + s.id + '" aria-label="Delete ride">Delete</button></td></tr>';
+  }).join("");
+  return '<h1>History</h1>' + pick + '<div class="grid2">' + cards + "</div>" +
+    '<div class="panel"><h3>Recent rides</h3>' + (rows ? '<div class="tablebox"><table><thead><tr><th>When</th><th>Workout</th><th class="r">Score</th><th class="r">Peak W</th><th></th></tr></thead><tbody>' + rows + "</tbody></table></div>" : '<p class="muted" style="margin:0">No rides yet.</p>') + "</div>";
+}
+bind.history = function () {
+  document.querySelectorAll("[data-hr]").forEach(function (b) { b.onclick = function () { app.riderId = b.dataset.hr; render(); }; });
+  document.querySelectorAll("[data-del]").forEach(function (b) {
+    b.onclick = function () {
+      modal("Delete this ride?", "<p>It will be removed from history and personal bests.</p>", [
+        { label: "Delete", cls: "danger", fn: function () { db.sessions = db.sessions.filter(function (s) { return s.id !== b.dataset.del; }); save(); render(); } },
+        { label: "Keep it", cls: "primary" }]);
+    };
+  });
+};
+
+/* Family board */
+function viewBoard() {
+  var w = wk(app.board);
+  var rows = db.riders.map(function (r) {
+    var ss = sessionsFor(r.id, w.id, false); if (!ss.length) return null;
+    var best = bestFor(r.id, w.id, false), first = ss[0].score;
+    var imp = ss.length > 1 && first > 0 ? (best - first) / first * 100 : null;
+    return { r: r, best: best, first: first, imp: imp, n: ss.length };
+  }).filter(Boolean);
+  rows.sort(app.boardSort === "best" ? function (a, b) { return b.best - a.best; } : function (a, b) { return (b.imp == null ? -1e9 : b.imp) - (a.imp == null ? -1e9 : a.imp); });
+  var body = rows.map(function (x, i) {
+    return '<tr><td><span class="rank">' + (i + 1) + '</span></td><td><span class="who"><span class="avatar sm" style="background:' + x.r.color + '">' + esc(initials(x.r.name)) + "</span>" + esc(x.r.name) +
+      '</span></td><td class="r num" style="font-size:1.5rem">' + fmtScore(w, x.best) + '</td><td class="r">' + fmtScore(w, x.first) +
+      '</td><td class="r" style="color:' + (x.imp > 0 ? "var(--bench)" : "var(--muted)") + '">' + (x.imp == null ? "—" : (x.imp >= 0 ? "+" : "") + x.imp.toFixed(0) + "%") + '</td><td class="r">' + x.n + "</td></tr>";
+  }).join("");
+  return '<section style="display:grid;gap:8px"><h1>Family board</h1><p class="muted">Kids and adults put out very different watts, so “Most improved” compares each rider’s best with their own first score.</p></section>' +
+    '<div class="tabs">' + WORKOUTS.map(function (x) { return '<button data-bw="' + x.id + '" aria-pressed="' + (x.id === w.id) + '">' + x.name + "</button>"; }).join("") + "</div>" +
+    '<div class="tabs"><button data-bs="best" aria-pressed="' + (app.boardSort === "best") + '">Best score</button><button data-bs="imp" aria-pressed="' + (app.boardSort === "imp") + '">Most improved</button></div>' +
+    '<div class="panel">' + (body ? '<div class="tablebox"><table><thead><tr><th></th><th>Rider</th><th class="r">Best ' + w.unit + '</th><th class="r">First</th><th class="r">Improved</th><th class="r">Rides</th></tr></thead><tbody>' + body + "</tbody></table></div>"
+      : '<p class="muted" style="margin:0">No one has ridden ' + w.name + " yet. Demo rides don’t count here.</p>") + "</div>";
+}
+bind.board = function () {
+  document.querySelectorAll("[data-bw]").forEach(function (b) { b.onclick = function () { app.board = b.dataset.bw; render(); }; });
+  document.querySelectorAll("[data-bs]").forEach(function (b) { b.onclick = function () { app.boardSort = b.dataset.bs; render(); }; });
+};
+
+/* Settings */
+function csv() {
+  var head = ["date", "rider", "workout", "score", "unit", "peak_watts", "avg_working_watts", "calories", "calories_estimated", "distance_m", "top_speed_kmh", "max_hr", "demo"];
+  var lines = [head.join(",")];
+  db.sessions.slice().sort(function (a, b) { return a.date - b.date; }).forEach(function (s) {
+    var r = rider(s.riderId);
+    lines.push([new Date(s.date).toISOString(), '"' + (r ? r.name : "").replace(/"/g, '""') + '"', wk(s.workout).name, s.score, s.unit, s.peakW, s.avgWorkW, s.kcal, s.kcalEstimated ? "yes" : "no", s.distM, s.peakKmh, s.maxHr || "", s.demo ? "yes" : "no"].join(","));
+  });
+  return lines.join("\n");
+}
+function copyText(t, okMsg) {
+  var done = function () { toast(okMsg); };
+  var fallback = function () {
+    modal("Copy this text", '<p class="muted">Select all and copy, then paste it into Notes or Files.</p><textarea id="cpy" readonly>' + esc(t) + "</textarea>", [{ label: "Done", cls: "primary" }]);
+    var ta = document.getElementById("cpy"); if (ta) { ta.focus(); ta.select(); }
+  };
+  try { navigator.clipboard.writeText(t).then(done, fallback); } catch (e) { fallback(); }
+}
+function downloadText(t, name, type) {
+  try {
+    var url = URL.createObjectURL(new Blob([t], { type: type })), a = document.createElement("a");
+    a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+    toast("If nothing downloaded, use Copy instead.");
+  } catch (e) { toast("This browser can't download files. Use Copy instead."); }
+}
+function viewSettings() {
+  var demoCount = db.sessions.filter(function (s) { return s.demo; }).length;
+  var riders = db.riders.map(function (r) {
+    return '<div class="row" style="justify-content:space-between;border-bottom:1px solid var(--line);padding-block:8px"><span class="who"><span class="avatar sm" style="background:' + r.color + '">' + esc(initials(r.name)) + "</span>" + esc(r.name) +
+      '</span><span class="row"><button class="btn small" data-ren="' + r.id + '">Rename</button><button class="btn small danger" data-rdel="' + r.id + '">Remove</button></span></div>';
+  }).join("");
+  return '<h1>Settings</h1><div class="grid2">' +
+    '<div class="panel"><h3>Bike</h3><p class="muted" style="margin:0">' + statusText() + (hasBluetooth() ? "." : ". This browser can’t use Bluetooth; open the page in Bluefy.") + "</p>" +
+    '<div class="row"><button class="btn primary" id="sConn">Connect bike</button><button class="btn" id="sAll">Show all devices</button>' +
+    (bike.status === "on" ? '<button class="btn ghost" id="sDisc">Disconnect</button>' : "") + "</div>" +
+    '<div class="row"><button class="btn" id="sDemo">' + (bike.demo ? "Stop demo mode" : "Start demo mode") + "</button></div>" +
+    '<p class="muted" style="margin:0;font-size:.9rem">Use “Show all devices” only if the SB750 doesn’t appear with Connect bike. It usually shows up with “SOLE” or “SB750” in the name.</p></div>' +
+    '<div class="panel"><h3>Riders</h3>' + (riders || '<p class="muted" style="margin:0">No riders yet.</p>') + "</div>" +
+    '<div class="panel"><h3>Backup</h3><p class="muted" style="margin:0">Rides are saved in this browser on this iPad only. Clearing website data or deleting the browser app erases them, so copy a backup now and then and paste it into Notes or iCloud Drive.</p>' +
+    '<div class="row"><button class="btn primary" id="bCopy">Copy backup</button><button class="btn" id="bDl">Download backup</button></div>' +
+    '<div class="row"><button class="btn" id="cCopy">Copy as spreadsheet (CSV)</button><button class="btn" id="cDl">Download CSV</button></div>' +
+    (app.restoreOpen ? '<label class="label" for="restoreText">Paste a backup</label><textarea id="restoreText" placeholder="{&quot;version&quot;:1,…}"></textarea><div class="row"><button class="btn primary" id="rGo">Replace everything with this backup</button><button class="btn ghost" id="rCancel">Cancel</button></div>'
+      : '<div class="row"><button class="btn ghost" id="rOpen">Restore from a backup…</button></div>') + "</div>" +
+    '<div class="panel"><h3>Demo rides</h3><p class="muted" style="margin:0">' + demoCount + " demo ride" + (demoCount === 1 ? "" : "s") + " saved. They’re tagged and never count toward bests or the family board.</p>" +
+    '<div class="row"><button class="btn danger" id="dDel"' + (demoCount ? "" : " disabled") + ">Delete demo rides</button></div></div></div>";
+}
+bind.settings = function () {
+  document.getElementById("sConn").onclick = function () { connectBike(false); };
+  document.getElementById("sAll").onclick = function () { connectBike(true); };
+  var dc = document.getElementById("sDisc"); if (dc) dc.onclick = disconnectBike;
+  document.getElementById("sDemo").onclick = function () { if (bike.demo) { stopDemo(); setStatus("off"); render(); } else { startDemo(); render(); } };
+  document.querySelectorAll("[data-ren]").forEach(function (b) {
+    b.onclick = function () {
+      var r = rider(b.dataset.ren);
+      modal("Rename rider", '<input type="text" id="renName" maxlength="20" value="' + esc(r.name) + '">', [
+        { label: "Save", cls: "primary", fn: function () {} }, { label: "Cancel", cls: "ghost" }]);
+      var btn = document.querySelector("#mbtns .primary");
+      btn.onclick = function () { var v = document.getElementById("renName").value.trim(); if (v) { r.name = v; save(); } document.getElementById("layer").innerHTML = ""; render(); };
+    };
+  });
+  document.querySelectorAll("[data-rdel]").forEach(function (b) {
+    b.onclick = function () {
+      var r = rider(b.dataset.rdel), n = sessionsFor(r.id).length;
+      modal("Remove " + r.name + "?", "<p>This also deletes their " + n + " ride" + (n === 1 ? "" : "s") + ". Copy a backup first if you might want them later.</p>", [
+        { label: "Remove", cls: "danger", fn: function () { db.riders = db.riders.filter(function (x) { return x.id !== r.id; }); db.sessions = db.sessions.filter(function (s) { return s.riderId !== r.id; }); if (app.riderId === r.id) app.riderId = null; save(); render(); } },
+        { label: "Cancel", cls: "primary" }]);
+    };
+  });
+  var stamp = new Date().toISOString().slice(0, 10);
+  document.getElementById("bCopy").onclick = function () { copyText(JSON.stringify(db), "Backup copied. Paste it into Notes or a file in iCloud Drive."); };
+  document.getElementById("bDl").onclick = function () { downloadText(JSON.stringify(db, null, 1), "sb750-backup-" + stamp + ".json", "application/json"); };
+  document.getElementById("cCopy").onclick = function () { copyText(csv(), "Spreadsheet copied. Paste into Numbers or Google Sheets."); };
+  document.getElementById("cDl").onclick = function () { downloadText(csv(), "sb750-rides-" + stamp + ".csv", "text/csv"); };
+  var ro = document.getElementById("rOpen"); if (ro) ro.onclick = function () { app.restoreOpen = true; render(); };
+  var rc = document.getElementById("rCancel"); if (rc) rc.onclick = function () { app.restoreOpen = false; render(); };
+  var rg = document.getElementById("rGo"); if (rg) rg.onclick = function () {
+    var d; try { d = JSON.parse(document.getElementById("restoreText").value); } catch (e) { d = null; }
+    if (!d || !Array.isArray(d.riders) || !Array.isArray(d.sessions)) { toast("That doesn't look like a scoreboard backup. Paste the whole text from Copy backup."); return; }
+    modal("Replace everything?", "<p>This replaces " + db.riders.length + " riders and " + db.sessions.length + " rides with " + d.riders.length + " riders and " + d.sessions.length + " rides from the backup.</p>", [
+      { label: "Replace", cls: "danger", fn: function () { db = { version: 1, riders: d.riders, sessions: d.sessions }; save(); app.restoreOpen = false; app.riderId = null; render(); toast("Backup restored."); } },
+      { label: "Cancel", cls: "primary" }]);
+  };
+  document.getElementById("dDel").onclick = function () {
+    db.sessions = db.sessions.filter(function (s) { return !s.demo; }); save(); render(); toast("Demo rides deleted.");
+  };
+};
+
+render();
+</script>
+</body>
+</html>
